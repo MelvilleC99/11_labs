@@ -12,20 +12,31 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Get from environment variables
+# Get from environment variables (try different possible names)
 SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY') 
+SUPABASE_ANON_KEY = (
+    os.getenv('SUPABASE_ANON_KEY') or 
+    os.getenv('SUPABASE_KEY') or 
+    os.getenv('SUPABASE_ANON') or
+    os.getenv('SUPABASE_API_KEY')
+)
 HMAC_SECRET = os.getenv('HMAC_SECRET')
 
 print(f"🔧 SUPABASE_URL: {SUPABASE_URL[:20]}..." if SUPABASE_URL else "❌ SUPABASE_URL not found")
 print(f"🔧 SUPABASE_ANON_KEY: {'✅ Found' if SUPABASE_ANON_KEY else '❌ Not found'}")
 print(f"🔧 HMAC_SECRET: {'✅ Found' if HMAC_SECRET else '❌ Not found'}")
 
+# Debug: Show all environment variables that contain 'SUPABASE'
+print("🔍 All SUPABASE env vars:")
+for key, value in os.environ.items():
+    if 'SUPABASE' in key.upper():
+        print(f"  {key}: {value[:20]}..." if value else f"  {key}: (empty)")
+
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     print("❌ Missing required environment variables!")
-    print("Make sure your .env file contains:")
+    print("In Render dashboard, make sure you have:")
     print("SUPABASE_URL=https://your-project.supabase.co")
-    print("SUPABASE_ANON_KEY=your-anon-key")
+    print("SUPABASE_ANON_KEY=your-anon-key (or SUPABASE_KEY)")
     exit(1)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
