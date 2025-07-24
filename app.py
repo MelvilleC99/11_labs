@@ -41,94 +41,17 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-def verify_hmac(data, signature):
-    """Verify HMAC signature from ElevenLabs"""
-    if not HMAC_SECRET:
-        print("⚠️  No HMAC_SECRET - skipping verification")
-        return True  # Skip verification if no secret
-    
-    expected = hmac.new(
-        HMAC_SECRET.encode(),
-        data,
-        hashlib.sha256
-    ).hexdigest()
-    
-    received = signature.replace('sha256=', '') if signature else ''
-    
-    print(f"🔐 HMAC Debug:")
-    print(f"   Expected: {expected[:20]}...")
-    print(f"   Received: {received[:20]}...")
-    print(f"   Match: {hmac.compare_digest(expected, received)}")
-    
-    # TEMPORARY: Always return True to test webhook
-    print("🚨 TEMPORARILY BYPASSING HMAC FOR TESTING")
-    return True
-    
-    # return hmac.compare_digest(expected, received)
-
-@app.route('/webhook/elevenlabs', methods=['POST'])
-def handle_webhook():
-    try:
-        # TEMPORARILY SKIP HMAC FOR DEBUGGING
-        print("🚨 BYPASSING HMAC CHECK FOR TESTING")
-        
-        # Get raw data for HMAC verification
-        raw_data = request.get_data()
-        signature = request.headers.get('X-ElevenLabs-Signature')
-        
-        print(f"📥 Received webhook call")
-        print(f"📝 Signature header: {signature}")
-        print(f"📊 Data length: {len(raw_data)} bytes")
-        
-        # SKIP HMAC CHECK FOR NOW
-        # if not verify_hmac(raw_data, signature):
-        #     print("❌ HMAC verification failed")
-        #     return jsonify({'error': 'unauthorized'}), 401
-        
-        # Get the JSON data from ElevenLabs
-        data = request.get_json()
-        
-        print("=== RECEIVED WEBHOOK ===")
-        print(json.dumps(data, indent=2))  # This will show you EVERYTHING
-        print("=======================")
-        
-        # Check if it's a conversation transcript
-        if data.get('type') == 'post_call_transcription':
-            conversation = data.get('data', {})
-            
-            # Extract what we need
-            conversation_record = {
-                'conversation_id': conversation.get('conversation_id', 'unknown'),
-                'transcript': conversation.get('transcript', ''),
-                'user_id': get_user_id(conversation),  # Handle the session ID issue
-                'call_duration': conversation.get('call_length_seconds', 0),
-                'success': conversation.get('call_successful', False),
-                'extracted_data': conversation.get('data_collection', {}),
-                'created_at': datetime.utcnow().isoformat(),
-                'full_data': conversation  # Store everything for debugging
-            }
-            
-            print("=== SAVING TO SUPABASE ===")
-            print(f"Conversation ID: {conversation_record['conversation_id']}")
-            print(f"User ID: {conversation_record['user_id']}")
-            print(f"Transcript length: {len(conversation_record['transcript'])} chars")
-            print("=========================")
-            
-            # Save to Supabase
-            result = supabase.table('conversations').insert(conversation_record).execute()
-            
-            if result.data:
-                print("✅ SUCCESS: Data saved to Supabase!")
-                return jsonify({'status': 'success'}), 200
-            else:
-                print("❌ ERROR: Failed to save to Supabase")
-                return jsonify({'error': 'database_error'}), 500
-                
-        return jsonify({'status': 'ignored'}), 200
-        
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+def get_clean_transcript(transcript_array):
+    """Convert transcript array to clean readable text"""
+    if isinstance(transcript_array, list):
+        clean_lines = []
+        for turn in transcript_array:
+            if isinstance(turn, dict):
+                role = turn.get('role', 'unknown')
+                message = turn.get('message', '')
+                clean_lines.append(f"{role.title()}: {message}")
+        return "\n".join(clean_lines)
+    return str(transcript_array)
 
 def get_user_id(conversation):
     """Handle the session ID issue you mentioned"""
@@ -146,6 +69,84 @@ def get_user_id(conversation):
         return f"user_{session_id[:8]}"  # First 8 chars of session
     
     return "anonymous_user"
+
+@app.route('/webhook/elevenlabs', methods=['POST'])
+def handle_webhook():
+    try:
+        # BYPASSING HMAC CHECK FOR TESTING
+        print("🚨 BYPASSING HMAC CHECK FOR TESTING")
+        
+        # Get raw data for logging
+        raw_data = request.get_data()
+        signature = request.headers.get('X-ElevenLabs-Signature')
+        
+        print(f"📥 Received webhook call")
+        print(f"📝 Signature header: {signature}")
+        print(f"📊 Data length: {len(raw_data)} bytes")
+        
+        # Get the JSON data from ElevenLabs
+        data = request.get_json()
+        
+        print("=== RECEIVED WEBHOOK ===")
+        print(json.dumps(data, indent=2))  # This will show you EVERYTHING
+        print("=======================")
+        
+        # Check if it's a conversation transcript
+        if data.get('type') == 'post_call_transcription':
+            conversation = data.get('data', {})
+            
+            # Extract the CLEAN organized data from ElevenLabs analysis
+            analysis = conversation.get('analysis', {})
+            data_collection = analysis.get('data_collection_results', {})
+            
+            # Build organized extracted data
+            organized_data = {}
+            for field_name, field_data in data_collection.items():
+                if isinstance(field_data, dict) and 'value' in field_data:
+                    organized_data[field_name] = {
+                        'value': field_data.get('value'),
+                        'rationale': field_data.get('rationale', '')
+                    }
+            
+            # Extract what we need
+            conversation_record = {
+                'conversation_id': conversation.get('conversation_id', 'unknown'),
+                'transcript': get_clean_transcript(conversation.get('transcript', [])),
+                'user_id': get_user_id(conversation),
+                'call_duration': conversation.get('call_duration_secs', 0),
+                'success': conversation.get('call_successful', False),
+                'extracted_data': organized_data,  # This is the clean organized data!
+                'analysis_summary': analysis.get('transcript_summary', ''),
+                'evaluation_results': analysis.get('evaluation_criteria_results', {}),
+                'created_at': datetime.utcnow().isoformat(),
+                'full_data': conversation  # Still keep raw data for debugging
+            }
+            
+            print("=== SAVING TO SUPABASE ===")
+            print(f"Conversation ID: {conversation_record['conversation_id']}")
+            print(f"User ID: {conversation_record['user_id']}")
+            print(f"Transcript length: {len(conversation_record['transcript'])} chars")
+            print(f"Extracted fields: {list(organized_data.keys())}")
+            print("=== ORGANIZED EXTRACTED DATA ===")
+            for field, data in organized_data.items():
+                print(f"{field}: {data['value']}")
+            print("=========================")
+            
+            # Save to Supabase
+            result = supabase.table('conversations').insert(conversation_record).execute()
+            
+            if result.data:
+                print("✅ SUCCESS: Data saved to Supabase!")
+                return jsonify({'status': 'success'}), 200
+            else:
+                print("❌ ERROR: Failed to save to Supabase")
+                return jsonify({'error': 'database_error'}), 500
+                
+        return jsonify({'status': 'ignored'}), 200
+        
+    except Exception as e:
+        print(f"❌ ERROR: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/test', methods=['GET'])
 def test():
@@ -166,6 +167,6 @@ def test():
 
 if __name__ == '__main__':
     print("🚀 Starting webhook server...")
-    print("📡 Webhook URL will be: http://your-ngrok-url.ngrok.io/webhook/elevenlabs")
+    print("📡 Webhook URL will be: https://one1-labs.onrender.com/webhook/elevenlabs")
     print("🧪 Test URL: http://localhost:5000/test")
     app.run(debug=True, host='0.0.0.0', port=5000)
