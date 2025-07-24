@@ -5,6 +5,10 @@ from supabase import create_client
 from datetime import datetime
 import hmac
 import hashlib
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -12,6 +16,17 @@ app = Flask(__name__)
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY') 
 HMAC_SECRET = os.getenv('HMAC_SECRET')
+
+print(f"🔧 SUPABASE_URL: {SUPABASE_URL[:20]}..." if SUPABASE_URL else "❌ SUPABASE_URL not found")
+print(f"🔧 SUPABASE_ANON_KEY: {'✅ Found' if SUPABASE_ANON_KEY else '❌ Not found'}")
+print(f"🔧 HMAC_SECRET: {'✅ Found' if HMAC_SECRET else '❌ Not found'}")
+
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    print("❌ Missing required environment variables!")
+    print("Make sure your .env file contains:")
+    print("SUPABASE_URL=https://your-project.supabase.co")
+    print("SUPABASE_ANON_KEY=your-anon-key")
+    exit(1)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
