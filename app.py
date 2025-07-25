@@ -70,6 +70,78 @@ def get_user_id(conversation):
     
     return "anonymous_user"
 
+@app.route('/tools/getUserContext', methods=['POST'])
+def get_user_context():
+    """Tool endpoint for agent to get user's previous context"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'test_user_123')
+        
+        print(f"🔍 Getting context for user: {user_id}")
+        
+        # Get user's previous conversations from Supabase
+        result = supabase.table('conversations')\
+            .select('extracted_data, analysis_summary, created_at')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if not result.data:
+            return jsonify({
+                "status": "new_user",
+                "message": "New user - starting fresh with section 1",
+                "context_summary": "No previous sessions found"
+            })
+        
+        # Process the organized data from database
+        latest_session = result.data[0]
+        extracted_data = latest_session.get('extracted_data', {})
+        
+        # Build context summary from the clean data structure
+        completed_fields = []
+        missing_fields = []
+        
+        key_fields = [
+            'broad_domain_expertise',
+            'specific_niche_focus', 
+            'ideal_client_definition',
+            'target_customer_problems',
+            'signature_outcomes'
+        ]
+        
+        for field in key_fields:
+            if field in extracted_data and extracted_data[field].get('value'):
+                field_display = field.replace('_', ' ').title()
+                value = extracted_data[field]['value'][:50] + "..." if len(extracted_data[field]['value']) > 50 else extracted_data[field]['value']
+                completed_fields.append(f"{field_display}: {value}")
+            else:
+                missing_fields.append(field.replace('_', ' ').title())
+        
+        if completed_fields:
+            recap = f"Welcome back! From our previous session, I know: {'; '.join(completed_fields[:2])}."
+            if missing_fields:
+                recap += f" We still need to discuss: {', '.join(missing_fields[:2])}."
+        else:
+            recap = "Welcome back! I see you've started before. Let's continue where we left off."
+            
+        return jsonify({
+            "status": "returning_user",
+            "message": recap,
+            "context_summary": "; ".join(completed_fields) if completed_fields else "Previous session but no data extracted",
+            "completed_count": len(completed_fields),
+            "missing_count": len(missing_fields),
+            "last_session": latest_session.get('created_at')
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in getUserContext: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": "I'll help you create your LinkedIn persona from scratch!",
+            "context_summary": f"Error retrieving context: {str(e)}"
+        }), 200  # Return 200 so agent continues
+
 @app.route('/webhook/elevenlabs', methods=['POST'])
 def handle_webhook():
     try:
@@ -115,11 +187,11 @@ def handle_webhook():
                 'user_id': get_user_id(conversation),
                 'call_duration': conversation.get('call_duration_secs', 0),
                 'success': conversation.get('call_successful', False),
-                'extracted_data': organized_data,  # This is the clean organized data!
+                'extracted_data': organized_data,  # This is clean organized JSONB data
                 'analysis_summary': analysis.get('transcript_summary', ''),
                 'evaluation_results': analysis.get('evaluation_criteria_results', {}),
                 'created_at': datetime.utcnow().isoformat(),
-                'full_data': conversation  # Still keep raw data for debugging
+                'full_data': conversation  # Complete raw data as JSONB
             }
             
             print("=== SAVING TO SUPABASE ===")
