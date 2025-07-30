@@ -1,0 +1,185 @@
+{
+  "base_url": "https://www.civitas.network/",
+  "extraction_timestamp": "2025-07-29T14:52:14.976338",
+  "pages_scraped": 4,
+  "successful_pages": 4,
+  "page_urls": [
+    "https://www.civitas.network/",
+    "https://www.civitas.network/contact",
+    "https://www.civitas.network/about",
+    "https://www.civitas.network/careers"
+  ],
+  "extracted_company_data": {
+    "cover_page": {
+      "company_name": "Civitas",
+      "tagline_slogan": "A Private Network for Founders & CEOs in South Africa",
+      "logo_url": null,
+      "date_of_issue": null
+    },
+    "company_snapshot": {
+      "founded": null,
+      "headquarters": "South Africa",
+      "legal_structure": null,
+      "number_of_employees": null,
+      "annual_revenue_funding": "+1bn Over $1 billion funding raised",
+      "website": "https://www.civitas.network/",
+      "industries_sectors": "Networking, Business Services"
+    },
+    "mission_vision_values": {
+      "mission_statement": "Our mission was to create a community that was a mash up of Y Combinator (the world top accelerator), Young Presidents organisation (the world’s largest CEO network), and a wealthy entrepreneurial family and make it radically affordable to anyone who had the potential of building a $100 million dollar company.",
+      "vision_statement": null,
+      "core_values": null
+    },
+    "history_milestones": {
+      "key_milestones": null,
+      "founding_story": "Civitas was founded by Ryan Osher & Paul Smith with the aim to help founders succeed and build successful companies.",
+      "major_achievements": null
+    },
+    "leadership_governance": {
+      "executive_team": [
+        {
+          "name": "Ryan Osher",
+          "role": "Founder",
+          "bio": null
+        },
+        {
+          "name": "Paul Smith",
+          "role": "Founder",
+          "bio": null
+        }
+      ],
+      "board_directors_advisors": null,
+      "founders": "Ryan Osher & Paul Smith"
+    },
+    "products_solutions": {
+      "product_portfolio": null,
+      "launch_years": null,
+      "key_features": null,
+      "pricing_models": null,
+      "product_roadmap": null
+    },
+    "services": {
+      "service_offerings": "Civitas provides a private network for founders and CEOs to connect and learn from each other.",
+      "methodology_delivery": null,
+      "engagement_models": null,
+      "pricing_structure": null,
+      "success_metrics": null
+    },
+    "markets_customers": {
+      "target_segments": "Founders & CEOs",
+      "geographical_markets": "South Africa",
+      "key_clients": null,
+      "testimonials_case_studies": null
+    },
+    "value_proposition": {
+      "unique_selling_points": "Civitas provides a unique platform for founders and CEOs to connect, learn and grow their businesses.",
+      "competitive_differentiators": null,
+      "proof_points": null
+    },
+    "operating_locations": {
+      "countries_of_operation": "South Africa",
+      "offices_facilities": null,
+      "remote_work_policy": null
+    },
+    "key_metrics_performance": {
+      "growth_metrics": "Average annual growth 390%",
+      "market_share": null,
+      "customer_satisfaction": null,
+      "retention_churn": null,
+      "other_kpis": null
+    },
+    "financial_highlights": {
+      "revenue_trends": null,
+      "profitability": null,
+      "funding_rounds": null,
+      "investors": null
+    },
+    "certifications_compliance": {
+      "standards_certifications": null,
+      "regulatory_approvals": null,
+      "security_privacy": null
+    },
+    "partnerships_alliances": {
+      "technology_partners": null,
+      "channel_partners": null,
+      "strategic_alliances": null
+    },
+    "awards_recognition": {
+      "industry_awards": null,
+      "recognition": null,
+      "rankings": null
+    },
+    "csr_sustainability": {
+      "environmental_initiatives": null,
+      "social_impact": null,
+      "esg_governance": null
+    },
+    "technology_innovation": {
+      "rd_focus": null,
+      "patents_ip": null,
+      "technology_stack": null,
+      "innovation_programs": null
+    },
+    "risk_management": {
+      "key_risks": null,
+      "governance_framework": null,
+      "compliance_programs": null
+    },
+    "media_public_relations": {
+      "press_releases": null,
+      "media_coverage": null,
+      "thought_leadership": null
+    },
+    "culture_career": {
+      "employer_value_proposition": null,
+      "diversity_inclusion": null,
+      "learning_development": null,
+      "open_positions": null
+    },
+    "contact_information": {
+      "registered_address": null,
+      "phone_numbers": null,
+      "email_addresses": [
+        "info@civitas.network"
+      ],
+      "social_media_handles": null,
+      "investor_media_contacts": null
+    },
+    "contact_info": {
+      "email": "info@civitas.network",
+      "phone": "1000"
+    },
+    "social_proof": {
+      "testimonials": [
+        "network\n🚨 LOCATION CONTEXT: (function(){\"use strict\";if(window",
+        "wf-force-outline-none[tabindex=\"-1\"]:focus{outline:none;}CIVITAS ▼  A Private Network for Founders \n\n\n\n=== HOMEPAGE PAGE (https://www"
+      ]
+    }
+  },
+  "scraping_summary": {
+    "https://www.civitas.network/": {
+      "success": true,
+      "status_code": 200,
+      "content_length": 695600,
+      "error": null
+    },
+    "https://www.civitas.network/contact": {
+      "success": true,
+      "status_code": 200,
+      "content_length": 586325,
+      "error": null
+    },
+    "https://www.civitas.network/about": {
+      "success": true,
+      "status_code": 200,
+      "content_length": 591163,
+      "error": null
+    },
+    "https://www.civitas.network/careers": {
+      "success": true,
+      "status_code": 200,
+      "content_length": 598768,
+      "error": null
+    }
+  }
+}

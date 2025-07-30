@@ -1,0 +1,40 @@
+{
+  "company_basics": {
+    "company_name": "Civitas",
+    "tagline": "A Private Network for Founders & CEOs in South Africa",
+    "logo_url": null,
+    "founded_year": null,
+    "headquarters": "South Africa"
+  },
+  "mission_vision": {
+    "mission_statement": "Our mission was to create a community that was a mash up of Y Combinator (the world top accelerator), Young Presidents organisation (the world’s largest CEO network), and a wealthy entrepreneurial family and make it radically affordable to anyone who had the potential of building a $100 million dollar company.",
+    "vision_statement": null,
+    "core_values": null
+  },
+  "business_info": {
+    "industry": "Networking",
+    "company_size": null,
+    "target_market": "Founders & CEOs"
+  },
+  "offerings": {
+    "main_services": "Networking, Peer Learning",
+    "main_products": null,
+    "key_features": "Meaningful connections, Practical learning experiences"
+  },
+  "positioning": {
+    "value_proposition": "Helping founders succeed",
+    "competitive_advantages": "Access to a community of successful founders and CEOs",
+    "unique_selling_points": "Radically affordable, Potential to build a $100 million dollar company"
+  },
+  "social_proof": {
+    "testimonials": null,
+    "case_studies": null,
+    "awards": null
+  },
+  "contact_info": {
+    "email": "info@civitas.network",
+    "phone": "400 000",
+    "address": null,
+    "social_media": null
+  }
+}

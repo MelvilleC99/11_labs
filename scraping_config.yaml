@@ -1,0 +1,143 @@
+# Website Scraping Configuration
+# Based on the company profile template requirements
+
+scraperapi:
+  # Default ScraperAPI parameters
+  render: true              # Enable JavaScript rendering
+  country_code: "us"        # Scrape from US location
+  device_type: "desktop"    # Desktop user agent
+  format: "html"           # Return format
+  timeout: 30000           # 30 second timeout
+  retry_404: false         # Don't retry 404s
+  keep_headers: true       # Preserve response headers
+
+# Company data extraction targets
+extraction_targets:
+  # Basic company information
+  company_basics:
+    - company_name
+    - tagline
+    - logo_url
+    - headquarters
+    - founded_year
+    
+  # Mission and values
+  mission_vision:
+    - mission_statement
+    - vision_statement
+    - core_values
+    
+  # Business information
+  business_info:
+    - industries
+    - employee_count
+    - annual_revenue
+    - legal_structure
+    
+  # Products and services
+  offerings:
+    - products
+    - services
+    - pricing_models
+    - key_features
+    
+  # Market positioning
+  positioning:
+    - target_segments
+    - value_proposition
+    - competitive_advantages
+    - unique_selling_points
+    
+  # Social proof
+  social_proof:
+    - testimonials
+    - case_studies
+    - client_logos
+    - awards
+    - certifications
+    
+  # Contact and presence
+  contact_info:
+    - phone_numbers
+    - email_addresses
+    - social_media_handles
+    - office_locations
+
+# Pages to scrape (priority order)
+scraping_pages:
+  primary:
+    - "/"                    # Homepage
+    - "/about"               # About page
+    - "/about-us"
+    - "/company"
+  
+  secondary:
+    - "/products"            # Products/Services
+    - "/services"
+    - "/solutions"
+    - "/what-we-do"
+    
+  tertiary:
+    - "/team"                # Team/Leadership
+    - "/leadership"
+    - "/management"
+    - "/founders"
+    
+  additional:
+    - "/contact"             # Contact info
+    - "/careers"             # Career/culture info
+    - "/testimonials"        # Social proof
+    - "/case-studies"
+    - "/clients"
+
+# HTML selectors for common data extraction
+selectors:
+  company_name:
+    - "h1"
+    - ".company-name"
+    - ".logo-text"
+    - "title"
+    - "[data-company-name]"
+    
+  tagline:
+    - ".tagline"
+    - ".slogan" 
+    - ".subtitle"
+    - "h2:first-of-type"
+    - ".hero-subtitle"
+    
+  mission_statement:
+    - ".mission"
+    - "[data-mission]"
+    - "p:contains('mission')"
+    - ".about-mission"
+    
+  contact_email:
+    - "a[href^='mailto:']"
+    - ".email"
+    - "[data-email]"
+    
+  phone:
+    - "a[href^='tel:']"
+    - ".phone"
+    - "[data-phone]"
+
+# Content extraction patterns
+extraction_patterns:
+  email_regex: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+  phone_regex: "\\+?[1-9]\\d{1,14}"
+  year_regex: "(19|20)\\d{2}"
+  
+# Error handling
+error_handling:
+  max_retries: 3
+  retry_delay: 5            # seconds
+  timeout_handling: "log_and_continue"
+  connection_errors: "retry"
+  
+# Output configuration  
+output:
+  save_html: true
+  save_metadata: true
+  extract_text_only: false
+  preserve_formatting: true
