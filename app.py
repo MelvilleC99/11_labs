@@ -167,8 +167,8 @@ def handle_webhook():
         if data.get('type') == 'post_call_transcription':
             conversation = data.get('data', {})
             
-            # Pull the analysis block from the correct spot (top-level payload)
-            analysis = data.get('analysis', {})
+            # Extract the CLEAN organized data from ElevenLabs analysis
+            analysis = conversation.get('analysis', {})
             data_collection = analysis.get('data_collection_results', {})
             
             # Build organized extracted data
