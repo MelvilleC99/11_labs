@@ -209,6 +209,17 @@ def handle_webhook():
             
             if result.data:
                 print("✅ SUCCESS: Data saved to Supabase!")
+
+                # Upsert each extracted field into the narrow table
+                for key, field_data in organized_data.items():
+                    supabase.table('user_data_points').upsert({
+                        'user_id':         conversation_record['user_id'],
+                        'data_point_key':  key,
+                        'value':           field_data.get('value'),
+                        'rationale':       field_data.get('rationale', ''),
+                        'answered_at':     conversation_record['created_at']
+                    }, on_conflict=['user_id','data_point_key']).execute()
+
                 return jsonify({'status': 'success'}), 200
             else:
                 print("❌ ERROR: Failed to save to Supabase")

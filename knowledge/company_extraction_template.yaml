@@ -1,0 +1,124 @@
+# Company Extraction Template
+# This template defines all the data fields that should be extracted from company websites
+
+cover_page:
+  company_name: "Official company name"
+  tagline_slogan: "Main tagline or slogan"
+  logo_url: "URL to company logo"
+  date_of_issue: "Date of profile creation"
+
+company_snapshot:
+  founded: "Year company was founded"
+  headquarters: "Location of headquarters with full address"
+  legal_structure: "Company legal structure (LLC, Corp, etc.)"
+  number_of_employees: "Employee count or size range"
+  annual_revenue_funding: "Revenue figures or funding amounts"
+  website: "Official website URL"
+  industries_sectors: "Primary and secondary industry sectors"
+
+mission_vision_values:
+  mission_statement: "What the company exists to achieve"
+  vision_statement: "Long-term aspirational goal"
+  core_values: "List of company core values with descriptions"
+
+history_milestones:
+  key_milestones: "List of significant company milestones with years"
+  founding_story: "How and why the company was started"
+  major_achievements: "Notable achievements and growth markers"
+
+leadership_governance:
+  executive_team: "C-level executives with roles and brief bios"
+  board_directors_advisors: "Board members and key advisors"
+  founders: "Company founders and their backgrounds"
+
+products_solutions:
+  product_portfolio: "Detailed list of products with descriptions"
+  launch_years: "When key products were launched"
+  key_features: "Competitive advantages of each product"
+  pricing_models: "How products are priced"
+  product_roadmap: "Future product development plans"
+
+services:
+  service_offerings: "Detailed service descriptions"
+  methodology_delivery: "How services are delivered"
+  engagement_models: "Different ways clients can engage"
+  pricing_structure: "Service pricing and engagement terms"
+  success_metrics: "KPIs and success measurements"
+
+markets_customers:
+  target_segments: "Detailed customer personas and segments"
+  geographical_markets: "Countries and regions served"
+  key_clients: "Notable clients and customer logos"
+  testimonials_case_studies: "Customer success stories and testimonials"
+
+value_proposition:
+  unique_selling_points: "What makes the company unique"
+  competitive_differentiators: "How they differ from competitors"
+  proof_points: "Data, awards, and validation of claims"
+
+operating_locations:
+  countries_of_operation: "All countries where company operates"
+  offices_facilities: "Physical locations with addresses"
+  remote_work_policy: "Remote and hybrid work arrangements"
+
+key_metrics_performance:
+  growth_metrics: "Year-over-year growth percentages"
+  market_share: "Position in the market"
+  customer_satisfaction: "NPS, CSAT, and other satisfaction metrics"
+  retention_churn: "Customer retention and churn rates"
+  other_kpis: "Business-specific key performance indicators"
+
+financial_highlights:
+  revenue_trends: "Revenue growth over recent years"
+  profitability: "Profit margins and financial health"
+  funding_rounds: "Investment rounds and funding history"
+  investors: "Key investors and investment partners"
+
+certifications_compliance:
+  standards_certifications: "ISO, SOC 2, PCI-DSS, and other certifications"
+  regulatory_approvals: "Industry-specific regulatory compliance"
+  security_privacy: "Security and privacy policies and measures"
+
+partnerships_alliances:
+  technology_partners: "Key technology and integration partners"
+  channel_partners: "Distribution and channel partnerships"
+  strategic_alliances: "Strategic business partnerships"
+
+awards_recognition:
+  industry_awards: "Awards received with years and issuers"
+  recognition: "Media recognition and industry acknowledgments"
+  rankings: "Industry rankings and analyst recognition"
+
+csr_sustainability:
+  environmental_initiatives: "Environmental and sustainability programs"
+  social_impact: "Community and social impact programs"
+  esg_governance: "ESG scores and governance practices"
+
+technology_innovation:
+  rd_focus: "Research and development focus areas"
+  patents_ip: "Patents and intellectual property portfolio"
+  technology_stack: "Technology platforms and infrastructure"
+  innovation_programs: "Innovation labs and development programs"
+
+risk_management:
+  key_risks: "Major business risks and mitigation strategies"
+  governance_framework: "Corporate governance structure"
+  compliance_programs: "Compliance and risk management programs"
+
+media_public_relations:
+  press_releases: "Recent press releases and announcements"
+  media_coverage: "Notable media coverage and mentions"
+  thought_leadership: "White papers, blogs, and thought leadership content"
+
+culture_career:
+  employer_value_proposition: "What makes the company a great place to work"
+  diversity_inclusion: "D&I initiatives and commitments"
+  learning_development: "Employee development and training programs"
+  open_positions: "Current job openings and career opportunities"
+
+contact_information:
+  registered_address: "Official business address"
+  phone_numbers: "Primary phone and departmental numbers"
+  email_addresses: "General and departmental email addresses"
+  social_media_handles: "Social media accounts and handles"
+  investor_media_contacts: "Specific contacts for investors and media"
