@@ -54,21 +54,22 @@ def get_clean_transcript(transcript_array):
     return str(transcript_array)
 
 def get_user_id(conversation):
-    """Handle the session ID issue you mentioned"""
+    """Extract user ID with proper fallbacks for testing"""
     
-    # Try to get user_id from dynamic variables (if you set it in ElevenLabs)
-    dynamic_vars = conversation.get('dynamic_variables', {})
+    # Try to get from dynamic variables (when coming from your frontend)
+    client_data = conversation.get('conversation_initiation_client_data', {})
+    dynamic_vars = client_data.get('dynamic_variables', {})
+    
     if 'user_id' in dynamic_vars:
         return dynamic_vars['user_id']
     
-    # Try to get from session or other fields
-    session_id = conversation.get('session_id') or conversation.get('conversation_id')
+    # For testing from ElevenLabs dashboard, use user_name if available
+    if 'user_name' in dynamic_vars:
+        return f"test_user_{dynamic_vars['user_name']}"
     
-    # For now, create a consistent user ID from session
-    if session_id:
-        return f"user_{session_id[:8]}"  # First 8 chars of session
-    
-    return "anonymous_user"
+    # Final fallback - create consistent ID from conversation
+    conversation_id = conversation.get('conversation_id', 'unknown')
+    return f"test_user_{conversation_id[:8]}"
 
 @app.route('/tools/getUserContext', methods=['POST'])
 def get_user_context():
@@ -150,7 +151,7 @@ def handle_webhook():
         
         # Get raw data for logging
         raw_data = request.get_data()
-        signature = request.headers.get('X-ElevenLabs-Signature')
+        signature = request.headers.get('ElevenLabs-Signature')  # Fixed: Remove X- prefix
         
         print(f"📥 Received webhook call")
         print(f"📝 Signature header: {signature}")
@@ -210,15 +211,32 @@ def handle_webhook():
             if result.data:
                 print("✅ SUCCESS: Data saved to Supabase!")
 
-                # Upsert each extracted field into the narrow table
+                # Upsert each extracted field into the narrow table with error handling
+                datapoint_successes = 0
+                datapoint_errors = []
+                
                 for key, field_data in organized_data.items():
-                    supabase.table('user_data_points').upsert({
-                        'user_id':         conversation_record['user_id'],
-                        'data_point_key':  key,
-                        'value':           field_data.get('value'),
-                        'rationale':       field_data.get('rationale', ''),
-                        'answered_at':     conversation_record['created_at']
-                    }, on_conflict=['user_id','data_point_key']).execute()
+                    try:
+                        result = supabase.table('user_data_points').upsert({
+                            'user_id': conversation_record['user_id'],
+                            'data_point_key': key,
+                            'value': field_data.get('value'),
+                            'rationale': field_data.get('rationale', ''),
+                            'answered_at': conversation_record['created_at']
+                        }, on_conflict='user_id,data_point_key').execute()
+                        
+                        if result.data:
+                            datapoint_successes += 1
+                            print(f"✅ Saved datapoint: {key}")
+                        else:
+                            datapoint_errors.append(f"No data returned for {key}")
+                            print(f"❌ Failed to save {key}: No data returned")
+                            
+                    except Exception as e:
+                        datapoint_errors.append(f"Exception saving {key}: {str(e)}")
+                        print(f"❌ Error saving datapoint {key}: {e}")
+                
+                print(f"📊 Datapoints: {datapoint_successes} saved, {len(datapoint_errors)} errors")
 
                 return jsonify({'status': 'success'}), 200
             else:
