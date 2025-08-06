@@ -215,6 +215,17 @@ def handle_webhook():
                 
                 # Run cleanup to extract clean data to user_data_points
                 cleanup_conversation_data(conversation_record)
+                
+                return jsonify({'status': 'success'}), 200
+            else:
+                print("❌ ERROR: Failed to save to Supabase")
+                return jsonify({'error': 'database_error'}), 500
+                
+        return jsonify({'status': 'ignored'}), 200
+        
+    except Exception as e:
+        print(f"❌ ERROR: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 def cleanup_conversation_data(conversation_record):
     """Extract clean values from conversation data and save to user_data_points"""
