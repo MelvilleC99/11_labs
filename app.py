@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import json
 import os
 from supabase import create_client
-from datetime import datetime
+from datetime import datetime, timezone
 import hmac
 import hashlib
 from dotenv import load_dotenv
@@ -53,23 +53,36 @@ def get_clean_transcript(transcript_array):
         return "\n".join(clean_lines)
     return str(transcript_array)
 
-def get_user_id(conversation):
-    """Extract user ID with proper fallbacks for testing"""
+def get_user_data(conversation):
+    """Extract user ID and name with proper fallbacks"""
     
     # Try to get from dynamic variables (when coming from your frontend)
     client_data = conversation.get('conversation_initiation_client_data', {})
     dynamic_vars = client_data.get('dynamic_variables', {})
     
+    user_id = None
+    user_name = None
+    
+    # Extract from dynamic variables
     if 'user_id' in dynamic_vars:
-        return dynamic_vars['user_id']
-    
-    # For testing from ElevenLabs dashboard, use user_name if available
+        user_id = dynamic_vars['user_id']
     if 'user_name' in dynamic_vars:
-        return f"test_user_{dynamic_vars['user_name']}"
+        user_name = dynamic_vars['user_name']
     
-    # Final fallback - create consistent ID from conversation
-    conversation_id = conversation.get('conversation_id', 'unknown')
-    return f"test_user_{conversation_id[:8]}"
+    # Fallbacks for testing
+    if not user_id:
+        conversation_id = conversation.get('conversation_id', 'unknown')
+        user_id = f"test_user_{conversation_id[:8]}"
+    
+    if not user_name:
+        user_name = f"Test User {user_id[-4:]}"
+    
+    return user_id, user_name
+
+def get_user_id(conversation):
+    """Backward compatibility - extract just user ID"""
+    user_id, _ = get_user_data(conversation)
+    return user_id
 
 @app.route('/tools/getUserContext', methods=['POST'])
 def get_user_context():
@@ -145,19 +158,91 @@ def get_user_context():
             "context_summary": f"Error retrieving context: {str(e)}"
         }), 200  # Return 200 so agent continues
 
+def verify_hmac_signature(raw_data, signature, secret):
+    """Verify HMAC signature from ElevenLabs"""
+    if not signature or not secret:
+        return False
+    
+    try:
+        print(f"🔍 HMAC DEBUG:")
+        print(f"  Raw signature: {signature}")
+        print(f"  Secret: {secret[:10]}...")
+        
+        # ElevenLabs uses format: t=timestamp,v0=signature
+        if 'v0=' in signature:
+            # Parse ElevenLabs format: t=timestamp,v0=signature
+            parts = signature.split(',')
+            timestamp = None
+            sig_hex = None
+            
+            for part in parts:
+                if part.startswith('t='):
+                    timestamp = part[2:]
+                elif part.startswith('v0='):
+                    sig_hex = part[3:]
+            
+            print(f"  Timestamp: {timestamp}")
+            print(f"  Signature hex: {sig_hex}")
+            
+            if not sig_hex:
+                print("❌ No v0= signature found")
+                return False
+            
+            # Create payload for HMAC (timestamp + raw data)
+            payload = f"{timestamp}.".encode('utf-8') + raw_data
+            
+            # Create HMAC using the secret
+            expected_signature = hmac.new(
+                secret.encode('utf-8'),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+            
+            print(f"  Expected: {expected_signature}")
+            print(f"  Received: {sig_hex}")
+            
+            # Secure comparison
+            result = hmac.compare_digest(expected_signature, sig_hex)
+            print(f"  Match: {result}")
+            return result
+            
+        else:
+            # Fallback for simple sha256= format
+            if signature.startswith('sha256='):
+                signature = signature[7:]
+            
+            expected_signature = hmac.new(
+                secret.encode('utf-8'),
+                raw_data,
+                hashlib.sha256
+            ).hexdigest()
+            
+            return hmac.compare_digest(expected_signature, signature)
+        
+    except Exception as e:
+        print(f"❌ HMAC verification error: {e}")
+        return False
+
 @app.route('/webhook/elevenlabs', methods=['POST'])
 def handle_webhook():
     try:
-        # BYPASSING HMAC CHECK FOR TESTING
-        print("🚨 BYPASSING HMAC CHECK FOR TESTING")
-        
-        # Get raw data for logging
+        # Get raw data for HMAC verification
         raw_data = request.get_data()
-        signature = request.headers.get('ElevenLabs-Signature')  # Fixed: Remove X- prefix
+        signature = request.headers.get('ElevenLabs-Signature')
         
         print(f"📥 Received webhook call")
         print(f"📝 Signature header: {signature}")
         print(f"📊 Data length: {len(raw_data)} bytes")
+        
+        # HMAC verification (TEMPORARILY DISABLED FOR TESTING)
+        print("🚨 TEMPORARILY BYPASSING HMAC FOR TESTING")
+        # if HMAC_SECRET:
+        #     if not verify_hmac_signature(raw_data, signature, HMAC_SECRET):
+        #         print("❌ HMAC verification failed!")
+        #         return jsonify({'error': 'invalid_signature'}), 403
+        #     print("✅ HMAC verification passed")
+        # else:
+        #     print("⚠️  HMAC_SECRET not set - skipping verification")
         
         # Get the JSON data from ElevenLabs
         data = request.get_json()
@@ -183,23 +268,28 @@ def handle_webhook():
                         'rationale': field_data.get('rationale', '')
                     }
             
+            # Extract user data
+            user_id, user_name = get_user_data(conversation)
+            
             # Extract what we need
             conversation_record = {
                 'conversation_id': conversation.get('conversation_id', 'unknown'),
                 'transcript': get_clean_transcript(conversation.get('transcript', [])),
-                'user_id': get_user_id(conversation),
+                'user_id': user_id,
+                'user_name': user_name,  # NOW ENABLED after adding column
                 'call_duration': conversation.get('call_duration_secs', 0),
                 'success': conversation.get('call_successful', False),
                 'extracted_data': organized_data,  # This is clean organized JSONB data
                 'analysis_summary': analysis.get('transcript_summary', ''),
                 'evaluation_results': analysis.get('evaluation_criteria_results', {}),
-                'created_at': datetime.utcnow().isoformat(),
+                'created_at': datetime.now(timezone.utc).isoformat(),
                 'full_data': conversation  # Complete raw data as JSONB
             }
             
             print("=== SAVING TO SUPABASE ===")
             print(f"Conversation ID: {conversation_record['conversation_id']}")
             print(f"User ID: {conversation_record['user_id']}")
+            print(f"User Name: {conversation_record['user_name']}")
             print(f"Transcript length: {len(conversation_record['transcript'])} chars")
             print(f"Extracted fields: {list(organized_data.keys())}")
             print("=== ORGANIZED EXTRACTED DATA ===")
@@ -207,8 +297,25 @@ def handle_webhook():
                 print(f"{field}: {data['value']}")
             print("=========================")
             
-            # Save to Supabase
-            result = supabase.table('conversations').insert(conversation_record).execute()
+            # Save to Supabase - Try UPSERT first, fallback to INSERT
+            print("🔄 Attempting to save conversation...")
+            try:
+                # Try UPSERT first (if unique constraint exists)
+                result = supabase.table('conversations').upsert(
+                    conversation_record,
+                    on_conflict='conversation_id'
+                ).execute()
+                print("✅ Used UPSERT - conversation updated")
+            except Exception as upsert_error:
+                print(f"⚠️  UPSERT failed: {upsert_error}")
+                print("🔄 Falling back to INSERT...")
+                try:
+                    # Fallback to INSERT
+                    result = supabase.table('conversations').insert(conversation_record).execute()
+                    print("✅ Used INSERT - new conversation created")
+                except Exception as insert_error:
+                    print(f"❌ INSERT also failed: {insert_error}")
+                    return jsonify({'error': 'database_error'}), 500
             
             if result.data:
                 print("✅ SUCCESS: Data saved to Supabase!")
@@ -316,5 +423,5 @@ def test():
 if __name__ == '__main__':
     print("🚀 Starting webhook server...")
     print("📡 Webhook URL will be: https://one1-labs.onrender.com/webhook/elevenlabs")
-    print("🧪 Test URL: http://localhost:5000/test")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("🧪 Test URL: http://localhost:5001/test")
+    app.run(debug=True, host='0.0.0.0', port=5001)
