@@ -80,30 +80,26 @@ def get_user_context():
         
         print(f"🔍 Getting context for user: {user_id}")
         
-        # Get user's previous conversations from Supabase
-        result = supabase.table('conversations')\
-            .select('extracted_data, analysis_summary, created_at')\
+        # Get user's clean data points from the new table
+        result = supabase.table('user_data_points')\
+            .select('data_point_key, value')\
             .eq('user_id', user_id)\
-            .order('created_at', desc=True)\
-            .limit(1)\
             .execute()
         
         if not result.data:
             return jsonify({
                 "status": "new_user",
-                "message": "New user - starting fresh with section 1",
+                "message": "New user - starting fresh. Let's build your LinkedIn persona. What's a broad topic or domain you could speak about confidently for hours?",
                 "context_summary": "No previous sessions found"
             })
         
-        # Process the organized data from database
-        latest_session = result.data[0]
-        extracted_data = latest_session.get('extracted_data', {})
+        # Process the clean data points
+        user_data = {}
+        for item in result.data:
+            user_data[item['data_point_key']] = item['value']
         
-        # Build context summary from the clean data structure
-        completed_fields = []
-        missing_fields = []
-        
-        key_fields = [
+        # Check which required fields we have
+        required_fields = [
             'broad_domain_expertise',
             'specific_niche_focus', 
             'ideal_client_definition',
@@ -111,35 +107,41 @@ def get_user_context():
             'signature_outcomes'
         ]
         
-        for field in key_fields:
-            if field in extracted_data and extracted_data[field].get('value'):
+        completed_fields = []
+        missing_fields = []
+        
+        for field in required_fields:
+            if field in user_data and user_data[field] and user_data[field].strip():
                 field_display = field.replace('_', ' ').title()
-                value = extracted_data[field]['value'][:50] + "..." if len(extracted_data[field]['value']) > 50 else extracted_data[field]['value']
-                completed_fields.append(f"{field_display}: {value}")
+                value_preview = user_data[field][:40] + "..." if len(user_data[field]) > 40 else user_data[field]
+                completed_fields.append(f"{field_display}: {value_preview}")
             else:
                 missing_fields.append(field.replace('_', ' ').title())
         
+        # Create context message for the agent
         if completed_fields:
-            recap = f"Welcome back! From our previous session, I know: {'; '.join(completed_fields[:2])}."
-            if missing_fields:
-                recap += f" We still need to discuss: {', '.join(missing_fields[:2])}."
+            if len(missing_fields) == 0:
+                context_message = f"Welcome back! We've completed your LinkedIn persona: {'; '.join(completed_fields)}. Let me summarize everything we have."
+            else:
+                context_message = f"Welcome back! From our previous session, I have: {'; '.join(completed_fields[:2])}{'...' if len(completed_fields) > 2 else ''}. We still need to discuss: {', '.join(missing_fields[:2])}{'...' if len(missing_fields) > 2 else ''}."
         else:
-            recap = "Welcome back! I see you've started before. Let's continue where we left off."
+            context_message = "I see we've started before, but I don't have any complete information yet. Let's continue building your LinkedIn persona."
             
         return jsonify({
             "status": "returning_user",
-            "message": recap,
-            "context_summary": "; ".join(completed_fields) if completed_fields else "Previous session but no data extracted",
+            "message": context_message,
+            "context_summary": f"Completed: {len(completed_fields)}/5 fields | Missing: {', '.join(missing_fields) if missing_fields else 'None'}",
             "completed_count": len(completed_fields),
             "missing_count": len(missing_fields),
-            "last_session": latest_session.get('created_at')
+            "completed_fields": completed_fields,
+            "missing_fields": missing_fields
         })
         
     except Exception as e:
         print(f"❌ Error in getUserContext: {str(e)}")
         return jsonify({
             "status": "error", 
-            "message": "I'll help you create your LinkedIn persona from scratch!",
+            "message": "Let's build your LinkedIn persona from scratch! What's a broad topic or domain you could speak about confidently for hours?",
             "context_summary": f"Error retrieving context: {str(e)}"
         }), 200  # Return 200 so agent continues
 
@@ -210,33 +212,74 @@ def handle_webhook():
             
             if result.data:
                 print("✅ SUCCESS: Data saved to Supabase!")
+                
+                # Run cleanup to extract clean data to user_data_points
+                cleanup_conversation_data(conversation_record)
 
-                # Upsert each extracted field into the narrow table with error handling
-                datapoint_successes = 0
-                datapoint_errors = []
+def cleanup_conversation_data(conversation_record):
+    """Extract clean values from conversation data and save to user_data_points"""
+    try:
+        print("🧹 Starting data cleanup...")
+        
+        user_id = conversation_record['user_id']
+        extracted_data = conversation_record['extracted_data']
+        created_at = conversation_record['created_at']
+        
+        if not extracted_data:
+            print("⚠️  No extracted data to clean up")
+            return
+        
+        # Clean and save each field
+        cleanup_successes = 0
+        cleanup_errors = []
+        
+        # Skip these meta fields - we only want the actual user data
+        skip_fields = ['session_id', 'correction_handling', 'information_completeness_tracker']
+        
+        for field_name, field_data in extracted_data.items():
+            # Skip meta fields
+            if field_name in skip_fields:
+                continue
                 
-                for key, field_data in organized_data.items():
-                    try:
-                        result = supabase.table('user_data_points').upsert({
-                            'user_id': conversation_record['user_id'],
-                            'data_point_key': key,
-                            'value': field_data.get('value'),
-                            'rationale': field_data.get('rationale', ''),
-                            'answered_at': conversation_record['created_at']
-                        }, on_conflict='user_id,data_point_key').execute()
+            # Only save fields that have actual values
+            if isinstance(field_data, dict) and field_data.get('value'):
+                try:
+                    clean_record = {
+                        'user_id': user_id,
+                        'data_point_key': field_name,
+                        'value': str(field_data['value']).strip(),
+                        'rationale': str(field_data.get('rationale', '')).strip(),
+                        'answered_at': created_at
+                    }
+                    
+                    # Use upsert to handle updates
+                    result = supabase.table('user_data_points').upsert(
+                        clean_record,
+                        on_conflict='user_id,data_point_key'
+                    ).execute()
+                    
+                    if result.data:
+                        cleanup_successes += 1
+                        print(f"✅ Cleaned & saved: {field_name}")
+                    else:
+                        cleanup_errors.append(f"No result for {field_name}")
                         
-                        if result.data:
-                            datapoint_successes += 1
-                            print(f"✅ Saved datapoint: {key}")
-                        else:
-                            datapoint_errors.append(f"No data returned for {key}")
-                            print(f"❌ Failed to save {key}: No data returned")
-                            
-                    except Exception as e:
-                        datapoint_errors.append(f"Exception saving {key}: {str(e)}")
-                        print(f"❌ Error saving datapoint {key}: {e}")
+                except Exception as e:
+                    cleanup_errors.append(f"Error cleaning {field_name}: {str(e)}")
+                    print(f"❌ Cleanup error for {field_name}: {e}")
+            else:
+                print(f"⏭️  Skipping {field_name}: no value")
+        
+        print(f"🧹 Cleanup complete: {cleanup_successes} cleaned, {len(cleanup_errors)} errors")
+        
+        if cleanup_errors:
+            print("❌ Cleanup errors:")
+            for error in cleanup_errors:
+                print(f"  - {error}")
                 
-                print(f"📊 Datapoints: {datapoint_successes} saved, {len(datapoint_errors)} errors")
+    except Exception as e:
+        print(f"❌ Cleanup failed: {str(e)}")
+        # Don't fail the webhook - just log the error
 
                 return jsonify({'status': 'success'}), 200
             else:
