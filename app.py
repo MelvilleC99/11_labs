@@ -291,13 +291,6 @@ def cleanup_conversation_data(conversation_record):
     except Exception as e:
         print(f"❌ Cleanup failed: {str(e)}")
         # Don't fail the webhook - just log the error
-
-                return jsonify({'status': 'success'}), 200
-            else:
-                print("❌ ERROR: Failed to save to Supabase")
-                return jsonify({'error': 'database_error'}), 500
-                
-        return jsonify({'status': 'ignored'}), 200
         
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
