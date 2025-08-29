@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import json
 import os
 from supabase import create_client
@@ -6,11 +7,13 @@ from datetime import datetime, timezone
 import hmac
 import hashlib
 from dotenv import load_dotenv
+from workflows.scrape_workflow import ScrapeWorkflow
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for frontend communication
 
 # Get from environment variables (try different possible names)
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -40,6 +43,9 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     exit(1)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+# Initialize scraping workflow
+scrape_workflow = ScrapeWorkflow()
 
 def get_clean_transcript(transcript_array):
     """Convert transcript array to clean readable text"""
@@ -157,6 +163,72 @@ def get_user_context():
             "message": "Let's build your LinkedIn persona from scratch! What's a broad topic or domain you could speak about confidently for hours?",
             "context_summary": f"Error retrieving context: {str(e)}"
         }), 200  # Return 200 so agent continues
+
+@app.route('/scrape', methods=['POST'])
+def trigger_company_scrape():
+    """Endpoint to trigger company website scraping from frontend"""
+    try:
+        data = request.get_json()
+        company_url = data.get('company_url')
+        linkedin_url = data.get('linkedin_url')  # Optional
+        user_id = data.get('user_id')
+        user_name = data.get('user_name')
+        
+        print(f"🕷️  SCRAPING REQUEST RECEIVED")
+        print(f"User: {user_name} ({user_id})")
+        print(f"Company URL: {company_url}")
+        print(f"LinkedIn URL: {linkedin_url or 'Not provided'}")
+        print("=" * 60)
+        
+        if not company_url:
+            return jsonify({'error': 'company_url is required'}), 400
+        
+        # Start the scraping workflow
+        # This uses your existing scraping system!
+        print(f"🚀 Starting scraping workflow for {company_url}...")
+        
+        # Add debugging to check if workflow can be imported/initialized
+        try:
+            print("📋 Testing workflow initialization...")
+            workflow_result = scrape_workflow.run(
+                url=company_url,
+                user_id=user_id
+            )
+            print(f"📊 Workflow result: {workflow_result}")
+        except Exception as workflow_error:
+            print(f"❌ Workflow error: {str(workflow_error)}")
+            print(f"❌ Error type: {type(workflow_error).__name__}")
+            return jsonify({
+                'success': False,
+                'error': f'Workflow failed: {str(workflow_error)}',
+                'error_type': type(workflow_error).__name__
+            }), 500
+        
+        if workflow_result['success']:
+            print(f"✅ Scraping completed successfully for {user_id}")
+            print(f"Job ID: {workflow_result['job_id']}")
+            print("=" * 60)
+            return jsonify({
+                'success': True,
+                'message': 'Company data scraped and saved',
+                'job_id': workflow_result['job_id'],
+                'user_id': user_id
+            })
+        else:
+            print(f"❌ Scraping failed for {user_id}: {workflow_result.get('error')}")
+            print("=" * 60)
+            return jsonify({
+                'success': False,
+                'error': workflow_result.get('error', 'Scraping failed')
+            }), 500
+        
+    except Exception as e:
+        print(f"❌ Error in scrape endpoint: {e}")
+        print("=" * 60)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 def verify_hmac_signature(raw_data, signature, secret):
     """Verify HMAC signature from ElevenLabs"""
@@ -409,9 +481,19 @@ def test():
     try:
         # Test Supabase connection
         result = supabase.table('conversations').select('count').limit(1).execute()
+        
+        # Test if scrape_jobs table exists
+        try:
+            scrape_result = supabase.table('scrape_jobs').select('count').limit(1).execute()
+            scrape_table_status = "exists"
+        except Exception as e:
+            scrape_table_status = f"missing or error: {str(e)}"
+        
         return jsonify({
             'status': 'working',
             'supabase': 'connected',
+            'conversations_table': 'accessible',
+            'scrape_jobs_table': scrape_table_status,
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:

@@ -155,8 +155,7 @@ class ScrapeWorkflow:
         try:
             # Prepare data for database
             scrape_job_data = {
-                'id': job_id,
-                'user_id': user_id,
+                'user_id': user_id,  # Remove 'id' field - let database auto-generate it
                 'url': url,
                 'status': 'completed',
                 'raw_pages': raw_pages,
@@ -180,9 +179,12 @@ class ScrapeWorkflow:
             result = supabase.table('scrape_jobs').insert(scrape_job_data).execute()
             
             if result.data:
-                return {'success': True, 'id': job_id}
+                # Get the auto-generated ID from the result
+                generated_id = result.data[0].get('id', job_id)
+                return {'success': True, 'id': generated_id}
             else:
                 return {'success': False, 'error': 'Database insert failed'}
                 
         except Exception as e:
+            print(f"Database save error details: {str(e)}")
             return {'success': False, 'error': str(e)}
