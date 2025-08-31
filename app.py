@@ -92,24 +92,31 @@ def get_user_id(conversation):
 
 @app.route('/tools/getUserContext', methods=['POST'])
 def get_user_context():
-    """Tool endpoint for agent to get user's previous context"""
+    """Enhanced tool endpoint for multi-agent context retrieval"""
     try:
         data = request.get_json()
         user_id = data.get('user_id', 'test_user_123')
         
-        print(f"🔍 Getting context for user: {user_id}")
+        print(f"🔍 Multi-agent context lookup for user: {user_id}")
         
-        # Get user's clean data points from the new table
+        # Get all user data points with agent information
         result = supabase.table('user_data_points')\
-            .select('data_point_key, value')\
+            .select('data_point_key, value, agent_id, track_type')\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        # Get user's current progress
+        progress_result = supabase.table('user_progress')\
+            .select('track_type, current_agent, last_active')\
             .eq('user_id', user_id)\
             .execute()
         
         if not result.data:
             return jsonify({
                 "status": "new_user",
-                "message": "New user - starting fresh. Let's build your LinkedIn persona. What's a broad topic or domain you could speak about confidently for hours?",
-                "context_summary": "No previous sessions found"
+                "message": "Hi! I'm here to help you build your business foundation. Let's start - what's a broad domain where you have deep expertise?",
+                "context_summary": "No previous sessions found",
+                "user_progress": "Starting fresh"
             })
         
         # Process the clean data points
@@ -327,7 +334,46 @@ def handle_webhook():
         if data.get('type') == 'post_call_transcription':
             conversation = data.get('data', {})
             
+            # ========================================
+            # MULTI-AGENT SUPPORT: Extract agent information
+            # ========================================
+            
+            # Try to determine which agent this conversation came from
+            # ElevenLabs may include agent_id in the conversation data
+            agent_id = None
+            track_type = 'founder'  # Default to founder track for now
+            
+            # Method 1: Check if ElevenLabs provides agent_id directly
+            if 'agent_id' in conversation:
+                agent_id = conversation['agent_id']
+                print(f"🤖 Agent ID from conversation data: {agent_id}")
+            
+            # Method 2: Try to infer from conversation_id or other fields
+            conversation_id = conversation.get('conversation_id', 'unknown')
+            if not agent_id:
+                # You can add logic here to map conversation patterns to agents
+                # For now, we'll set a default
+                agent_id = 'value_architect'  # Default fallback
+                print(f"🔍 No agent_id found, defaulting to: {agent_id}")
+            else:
+                print(f"✅ Using agent_id: {agent_id}")
+            
+            # Map agent IDs to readable names for logging
+            agent_names = {
+                'agent_01k0ryjxvrfc2a2hwp4sy6n55c': 'value_architect',
+                'agent_6801k3tfx6gyfjta3qt8cfxwas6s': 'positioning_strategist', 
+                'agent_7901k3xnynzge67v88mrp64f8yv7': 'growth_architect'
+            }
+            
+            # Convert full agent ID to short name if needed
+            agent_short_name = agent_names.get(agent_id, agent_id)
+            
+            print(f"🎯 Processing conversation for agent: {agent_short_name}")
+            print(f"📋 Track type: {track_type}")
+            
+            # ========================================
             # Extract the CLEAN organized data from ElevenLabs analysis
+            # ========================================
             analysis = conversation.get('analysis', {})
             data_collection = analysis.get('data_collection_results', {})
             
@@ -343,31 +389,59 @@ def handle_webhook():
             # Extract user data
             user_id, user_name = get_user_data(conversation)
             
-            # Extract what we need
+            # ========================================
+            # Build conversation record with multi-agent support
+            # ========================================
             conversation_record = {
-                'conversation_id': conversation.get('conversation_id', 'unknown'),
+                'conversation_id': conversation_id,
                 'transcript': get_clean_transcript(conversation.get('transcript', [])),
                 'user_id': user_id,
-                'user_name': user_name,  # NOW ENABLED after adding column
+                'user_name': user_name,
                 'call_duration': conversation.get('call_duration_secs', 0),
                 'success': conversation.get('call_successful', False),
-                'extracted_data': organized_data,  # This is clean organized JSONB data
+                'extracted_data': organized_data,  # Clean organized JSONB data
                 'analysis_summary': analysis.get('transcript_summary', ''),
                 'evaluation_results': analysis.get('evaluation_criteria_results', {}),
                 'created_at': datetime.now(timezone.utc).isoformat(),
-                'full_data': conversation  # Complete raw data as JSONB
+                'full_data': conversation,  # Complete raw data as JSONB
+                # NEW: Multi-agent fields
+                'agent_id': agent_short_name,  # Store the readable agent name
+                'track_type': track_type       # Store the track type
             }
             
             print("=== SAVING TO SUPABASE ===")
             print(f"Conversation ID: {conversation_record['conversation_id']}")
             print(f"User ID: {conversation_record['user_id']}")
             print(f"User Name: {conversation_record['user_name']}")
+            print(f"Agent: {conversation_record['agent_id']} ({conversation_record['track_type']} track)")
             print(f"Transcript length: {len(conversation_record['transcript'])} chars")
             print(f"Extracted fields: {list(organized_data.keys())}")
             print("=== ORGANIZED EXTRACTED DATA ===")
             for field, data in organized_data.items():
                 print(f"{field}: {data['value']}")
             print("=========================")
+            
+            # ========================================
+            # UPDATE USER PROGRESS TRACKING
+            # ========================================
+            # Update or create user progress record
+            progress_record = {
+                'user_id': user_id,
+                'track_type': track_type,
+                'current_agent': agent_short_name,
+                'last_active': datetime.now(timezone.utc).isoformat()
+            }
+            
+            try:
+                # Upsert user progress (update if exists, insert if not)
+                progress_result = supabase.table('user_progress').upsert(
+                    progress_record,
+                    on_conflict='user_id'
+                ).execute()
+                print(f"✅ Updated user progress: {user_id} → {agent_short_name}")
+            except Exception as progress_error:
+                print(f"⚠️ Failed to update user progress: {progress_error}")
+                # Don't fail the webhook if progress update fails
             
             # Save to Supabase - Try UPSERT first, fallback to INSERT
             print("🔄 Attempting to save conversation...")
@@ -407,24 +481,33 @@ def handle_webhook():
         return jsonify({'error': str(e)}), 500
 
 def cleanup_conversation_data(conversation_record):
-    """Extract clean values from conversation data and save to user_data_points"""
+    """Extract clean values from conversation data and save to user_data_points with multi-agent support"""
     try:
-        print("🧹 Starting data cleanup...")
+        print("🧹 Starting multi-agent data cleanup...")
         
         user_id = conversation_record['user_id']
         extracted_data = conversation_record['extracted_data']
         created_at = conversation_record['created_at']
         
+        # NEW: Extract multi-agent fields
+        agent_id = conversation_record.get('agent_id', 'unknown')
+        track_type = conversation_record.get('track_type', 'founder')
+        
+        print(f"👤 User: {user_id}")
+        print(f"🤖 Agent: {agent_id}")
+        print(f"📋 Track: {track_type}")
+        
         if not extracted_data:
             print("⚠️  No extracted data to clean up")
             return
         
-        # Clean and save each field
+        # Clean and save each field with agent context
         cleanup_successes = 0
         cleanup_errors = []
         
         # Skip these meta fields - we only want the actual user data
-        skip_fields = ['session_id', 'correction_handling', 'information_completeness_tracker']
+        skip_fields = ['session_id', 'correction_handling', 'information_completeness_tracker', 
+                      'positioning_completeness_tracker', 'growth_completeness_tracker']
         
         for field_name, field_data in extracted_data.items():
             # Skip meta fields
@@ -439,10 +522,13 @@ def cleanup_conversation_data(conversation_record):
                         'data_point_key': field_name,
                         'value': str(field_data['value']).strip(),
                         'rationale': str(field_data.get('rationale', '')).strip(),
-                        'answered_at': created_at
+                        'answered_at': created_at,
+                        # NEW: Multi-agent fields
+                        'agent_id': agent_id,
+                        'track_type': track_type
                     }
                     
-                    # Use upsert to handle updates
+                    # Use upsert to handle updates (unique constraint on user_id + data_point_key)
                     result = supabase.table('user_data_points').upsert(
                         clean_record,
                         on_conflict='user_id,data_point_key'
@@ -450,7 +536,7 @@ def cleanup_conversation_data(conversation_record):
                     
                     if result.data:
                         cleanup_successes += 1
-                        print(f"✅ Cleaned & saved: {field_name}")
+                        print(f"✅ Cleaned & saved: {field_name} (agent: {agent_id})")
                     else:
                         cleanup_errors.append(f"No result for {field_name}")
                         
@@ -460,7 +546,7 @@ def cleanup_conversation_data(conversation_record):
             else:
                 print(f"⏭️  Skipping {field_name}: no value")
         
-        print(f"🧹 Cleanup complete: {cleanup_successes} cleaned, {len(cleanup_errors)} errors")
+        print(f"🧹 Multi-agent cleanup complete: {cleanup_successes} cleaned, {len(cleanup_errors)} errors")
         
         if cleanup_errors:
             print("❌ Cleanup errors:")
@@ -468,7 +554,7 @@ def cleanup_conversation_data(conversation_record):
                 print(f"  - {error}")
                 
     except Exception as e:
-        print(f"❌ Cleanup failed: {str(e)}")
+        print(f"❌ Multi-agent cleanup failed: {str(e)}")
         # Don't fail the webhook - just log the error
         
     except Exception as e:
