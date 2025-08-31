@@ -10,9 +10,12 @@ load_dotenv()
 class ScraperAPIClient:
     def __init__(self):
         self.api_key = os.getenv('SCRAPERAPI_KEY')
+        self._initialized = False
         
         if not self.api_key:
-            raise ValueError("Missing SCRAPERAPI_KEY in environment variables")
+            print("⚠️  Warning: SCRAPERAPI_KEY not found in environment variables")
+            print("⚠️  Scraping functionality will be disabled")
+            return
         
         self.base_url = 'http://api.scraperapi.com/'
         self.default_params = {
@@ -22,6 +25,11 @@ class ScraperAPIClient:
             'device_type': 'desktop',
             'timeout': 30000
         }
+        self._initialized = True
+    
+    def is_available(self):
+        """Check if the client is properly initialized"""
+        return self._initialized and self.api_key is not None
     
     def scrape_url(self, url, custom_params=None):
         """
@@ -34,6 +42,15 @@ class ScraperAPIClient:
         Returns:
             dict: Response with success status, html content, and metadata
         """
+        if not self.is_available():
+            return {
+                'success': False,
+                'status_code': None,
+                'html': None,
+                'url': url,
+                'error': 'ScraperAPI not configured - missing API key'
+            }
+        
         params = self.default_params.copy()
         params['url'] = url
         
@@ -60,5 +77,16 @@ class ScraperAPIClient:
                 'error': str(e)
             }
 
-# Global instance
-scraper_client = ScraperAPIClient()
+# Global instance - will be initialized when first accessed
+_scraper_client = None
+
+def get_scraper_client():
+    """Lazy initialization of scraper client"""
+    global _scraper_client
+    if _scraper_client is None:
+        _scraper_client = ScraperAPIClient()
+    return _scraper_client
+
+# For backward compatibility - but don't initialize yet
+def scraper_client():
+    return get_scraper_client()

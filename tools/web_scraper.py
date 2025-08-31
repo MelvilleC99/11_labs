@@ -10,7 +10,7 @@ from knowledge.scraping_config import load_scraping_config
 
 class WebScraper:
     def __init__(self):
-        self.client = scraper_client
+        self.client = scraper_client()
         self.config = load_scraping_config()
     
     def discover_internal_links(self, html, base_url):

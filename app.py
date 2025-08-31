@@ -7,7 +7,14 @@ from datetime import datetime, timezone
 import hmac
 import hashlib
 from dotenv import load_dotenv
-from workflows.scrape_workflow import ScrapeWorkflow
+
+# Try to import scrape workflow, but don't fail if it's not available
+try:
+    from workflows.scrape_workflow import ScrapeWorkflow
+    scrape_workflow = ScrapeWorkflow()
+except Exception as e:
+    print(f"⚠️ Could not import ScrapeWorkflow: {e}")
+    scrape_workflow = None
 
 # Load environment variables
 load_dotenv()
@@ -44,8 +51,7 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-# Initialize scraping workflow
-scrape_workflow = ScrapeWorkflow()
+# Initialize scraping workflow - already done in import section
 
 def get_clean_transcript(transcript_array):
     """Convert transcript array to clean readable text"""
@@ -313,15 +319,14 @@ def handle_webhook():
         print(f"📝 Signature header: {signature}")
         print(f"📊 Data length: {len(raw_data)} bytes")
         
-        # HMAC verification (TEMPORARILY DISABLED FOR TESTING)
-        print("🚨 TEMPORARILY BYPASSING HMAC FOR TESTING")
-        # if HMAC_SECRET:
-        #     if not verify_hmac_signature(raw_data, signature, HMAC_SECRET):
-        #         print("❌ HMAC verification failed!")
-        #         return jsonify({'error': 'invalid_signature'}), 403
-        #     print("✅ HMAC verification passed")
-        # else:
-        #     print("⚠️  HMAC_SECRET not set - skipping verification")
+        # HMAC verification
+        if HMAC_SECRET:
+            if not verify_hmac_signature(raw_data, signature, HMAC_SECRET):
+                print("❌ HMAC verification failed!")
+                return jsonify({'error': 'invalid_signature'}), 403
+            print("✅ HMAC verification passed")
+        else:
+            print("⚠️  HMAC_SECRET not set - skipping verification")
         
         # Get the JSON data from ElevenLabs
         data = request.get_json()
@@ -561,6 +566,11 @@ def cleanup_conversation_data(conversation_record):
         print(f"❌ ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/', methods=['GET'])
+def home():
+    """Simple health check"""
+    return jsonify({'status': 'running', 'service': 'luminary-agent'}), 200
+
 @app.route('/test', methods=['GET'])
 def test():
     """Test if everything is working"""
@@ -589,7 +599,8 @@ def test():
         }), 500
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
     print("🚀 Starting webhook server...")
-    print("📡 Webhook URL will be: https://one1-labs.onrender.com/webhook/elevenlabs")
-    print("🧪 Test URL: http://localhost:5001/test")
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    print(f"📡 Running on port: {port}")
+    print("🧪 Test endpoint: /test")
+    app.run(debug=False, host='0.0.0.0', port=port)
